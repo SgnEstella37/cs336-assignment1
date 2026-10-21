@@ -67,10 +67,10 @@ class MultiHeadSelfAttention(torch.nn.Module):
     rope: RotaryPositionalEmbedding
     T: int
     max_seq_len: int
-    W_Q: torch.Tensor
-    W_K: torch.Tensor
-    W_V: torch.Tensor
-    W_O: torch.Tensor
+    W_Q: Linear
+    W_K: Linear
+    W_V: Linear
+    W_O: Linear
 
     def __init__(self, d_model: int, num_heads: int, theta: float| None = None, max_seq_len: int=256):
         super().__init__()

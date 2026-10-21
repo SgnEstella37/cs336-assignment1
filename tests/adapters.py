@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import os
 from collections.abc import Iterable
 from typing import IO, Any, BinaryIO
@@ -20,7 +22,7 @@ from cs336_basics.model.feedforward import SwiGLU
 
 from cs336_basics.model.attention import RotaryPositionalEmbedding, scaled_dot_product_attention, MultiHeadSelfAttention
 
-from cs336_basics.model.transformer import TransformerBlock
+from cs336_basics.model.transformer import TransformerBlock, TransformerLM
 
 
 def run_linear(
@@ -412,8 +414,39 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    model=TransformerLM(vocab_size=vocab_size,context_length=context_length,d_model=d_model,num_heads=num_heads,num_layers=num_layers,d_ff=d_ff,rope_theta=rope_theta)
+    with torch.no_grad():
+        model.embedding.embedding_W.copy_(
+            weights["token_embeddings.weight"]
+        )
+        for i, module in enumerate(model.blocks):
+            block = cast(TransformerBlock, module)
 
+            # Attention
+            block.MHA.W_Q.W.copy_(weights[f"layers.{i}.attn.q_proj.weight"])
+            block.MHA.W_K.W.copy_(weights[f"layers.{i}.attn.k_proj.weight"])
+            block.MHA.W_V.W.copy_(weights[f"layers.{i}.attn.v_proj.weight"])
+            block.MHA.W_O.W.copy_(weights[f"layers.{i}.attn.output_proj.weight"])
+
+            # RMSNorm
+            block.norm1.gamma_para.copy_(weights[f"layers.{i}.ln1.weight"])
+            block.norm2.gamma_para.copy_(weights[f"layers.{i}.ln2.weight"])
+
+            # SwiGLU
+            block.FF.W_1.W.copy_(weights[f"layers.{i}.ffn.w1.weight"])
+            block.FF.W_2.W.copy_(weights[f"layers.{i}.ffn.w2.weight"])
+            block.FF.W_3.W.copy_(weights[f"layers.{i}.ffn.w3.weight"])
+        
+        # Final RMSNorm
+            model.final_norm.gamma_para.copy_(
+                weights["ln_final.weight"]
+            )
+
+            # LM Head
+            model.LM_Head.W.copy_(
+                weights["lm_head.weight"]
+            )
+    return model(in_indices)
 
 def run_rmsnorm(
     d_model: int,
