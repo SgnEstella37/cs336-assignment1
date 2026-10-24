@@ -2,7 +2,7 @@ import torch
 
 
 def gradient_clipping(parameters: list[torch.nn.Parameter], max_l2_norm: float, eps: float = 1e-6) -> None:
-    total_squared = 0.0
+    total_squared = torch.tensor(0.0)
     for p in parameters:
         if p.grad == None:
             continue
