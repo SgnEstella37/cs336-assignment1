@@ -24,6 +24,18 @@ from cs336_basics.model.attention import RotaryPositionalEmbedding, scaled_dot_p
 
 from cs336_basics.model.transformer import TransformerBlock, TransformerLM
 
+from cs336_basics.training.loss import cross_entropy
+
+from cs336_basics.training.AdamW_optimizer import AdamW
+
+from cs336_basics.training.lr_scheduler import learning_rate_scheduling
+
+from cs336_basics.training.gradient_clipping import gradient_clipping
+
+from cs336_basics.training.data_loader import get_batch
+
+from cs336_basics.training.check_point import save_checkpoint, load_checkpoint
+
 
 def run_linear(
     d_in: int,
@@ -335,6 +347,7 @@ def run_transformer_block(
 
     return block(in_features)
 
+
 def run_transformer_lm(
     vocab_size: int,
     context_length: int,
@@ -414,11 +427,17 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    model=TransformerLM(vocab_size=vocab_size,context_length=context_length,d_model=d_model,num_heads=num_heads,num_layers=num_layers,d_ff=d_ff,rope_theta=rope_theta)
+    model = TransformerLM(
+        vocab_size=vocab_size,
+        context_length=context_length,
+        d_model=d_model,
+        num_heads=num_heads,
+        num_layers=num_layers,
+        d_ff=d_ff,
+        rope_theta=rope_theta,
+    )
     with torch.no_grad():
-        model.embedding.embedding_W.copy_(
-            weights["token_embeddings.weight"]
-        )
+        model.embedding.embedding_W.copy_(weights["token_embeddings.weight"])
         for i, module in enumerate(model.blocks):
             block = cast(TransformerBlock, module)
 
@@ -436,17 +455,14 @@ def run_transformer_lm(
             block.FF.W_1.W.copy_(weights[f"layers.{i}.ffn.w1.weight"])
             block.FF.W_2.W.copy_(weights[f"layers.{i}.ffn.w2.weight"])
             block.FF.W_3.W.copy_(weights[f"layers.{i}.ffn.w3.weight"])
-        
-        # Final RMSNorm
-            model.final_norm.gamma_para.copy_(
-                weights["ln_final.weight"]
-            )
+
+            # Final RMSNorm
+            model.final_norm.gamma_para.copy_(weights["ln_final.weight"])
 
             # LM Head
-            model.LM_Head.W.copy_(
-                weights["lm_head.weight"]
-            )
+            model.LM_Head.W.copy_(weights["lm_head.weight"])
     return model(in_indices)
+
 
 def run_rmsnorm(
     d_model: int,
@@ -509,7 +525,7 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return get_batch(dataset, batch_size, context_length, device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
@@ -543,7 +559,8 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+
+    return cross_entropy(inputs, targets)
 
 
 def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
@@ -555,14 +572,14 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    gradient_clipping(parameters=parameters, max_l2_norm=max_l2_norm)
 
 
 def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    return AdamW
 
 
 def run_get_lr_cosine_schedule(
@@ -590,7 +607,8 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
+
+    return learning_rate_scheduling(it, max_learning_rate, min_learning_rate, warmup_iters, cosine_cycle_iters)
 
 
 def run_save_checkpoint(
@@ -609,7 +627,7 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    save_checkpoint(model, optimizer, iteration, out)
 
 
 def run_load_checkpoint(
@@ -630,7 +648,7 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    return load_checkpoint(src, model, optimizer)
 
 
 def get_tokenizer(
